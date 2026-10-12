@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Réservation billet TNR</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:system-ui,Arial,sans-serif;margin:0;padding:16px;background:#eef1f5;color:#16212e}
+form{max-width:640px;margin:auto;background:#fff;padding:18px;border-radius:8px}
+h1{font-size:19px;margin:0 0 14px;text-align:center}
+.row{display:flex;flex-wrap:wrap;gap:10px}
+.row>div{flex:1 1 180px}
+label{display:block;font-size:13px;margin:8px 0 3px}
+input,select{width:100%;padding:7px;border:1px solid #c3ccd6;border-radius:4px;font-size:14px}
+fieldset{margin-top:14px;border:1px solid #dde3ea;border-radius:6px;padding:8px 12px 12px}
+legend{font-size:13px;padding:0 4px}
+fieldset label{display:inline-flex;gap:5px;align-items:center;width:auto;margin-right:16px}
+fieldset input{width:auto}
+.btns{display:flex;gap:10px;margin-top:16px}
+button{flex:1;padding:10px;border:0;border-radius:4px;font-size:14px;color:#fff;background:#0b5ed7;cursor:pointer}
+button.sec{background:#6b7785}
+#res{margin-top:14px;padding:12px;border-radius:6px;background:#f2f6fb;font-size:14px;white-space:pre-line;display:none}
+#res.err{background:#fdecea;color:#a11}
+</style>
+</head>
+<body>
+<form id="f" novalidate>
+<h1>Réservation d'un billet TNR</h1>
+
+<div class="row">
+  <div><label for="nom">Nom</label><input id="nom"></div>
+  <div><label for="prenom">Prénom</label><input id="prenom"></div>
+</div>
+<label for="email">Email</label><input type="email" id="email">
+
+<div class="row">
+  <div><label for="dep">Ville de départ</label>
+    <select id="dep"><option value="">--</option><option>Casablanca</option><option>Rabat</option><option>Kénitra</option></select>
+  </div>
+  <div><label for="arr">Ville d'arrivée</label>
+    <select id="arr"><option value="">--</option><option>Casablanca</option><option>Rabat</option><option>Kénitra</option></select>
+  </div>
+</div>
+
+<div class="row">
+  <div><label for="classe">Classe</label>
+    <select id="classe"><option value="2">Deuxième classe</option><option value="1">Première classe (+50 DH/trajet/pers.)</option></select>
+  </div>
+  <div><label for="nb">Nombre de voyageurs</label><input type="number" id="nb" value="1" min="1"></div>
+</div>
+
+<fieldset><legend>Type de trajet</legend>
+  <label><input type="radio" name="type" value="s" checked> Aller simple</label>
+  <label><input type="radio" name="type" value="r"> Aller/retour</label>
+</fieldset>
+
+<fieldset><legend>Services à bord</legend>
+  <label><input type="checkbox" id="dej"> Déjeuner (60 DH)</label>
+  <label><input type="checkbox" id="jour"> Journaux (12 DH)</label>
+  <label><input type="checkbox" id="wifi"> Wifi (10 DH)</label>
+</fieldset>
+
+<div class="btns">
+  <button type="button" onclick="calculer()">Calculer prix</button>
+  <button type="button" class="sec" onclick="initialiser()">Initialiser</button>
+</div>
+<div id="res"></div>
+</form>
+
+<script>
+// tarifs : [aller simple, aller/retour] par personne, 2e classe
+const TARIFS = {
+  "Casablanca-Rabat":   [48, 90],
+  "Casablanca-Kénitra": [75, 140],
+  "Kénitra-Rabat":      [32, 96]
+};
+const $ = id => document.getElementById(id);
+
+function afficher(msg, erreur) {
+  const r = $("res");
+  r.textContent = msg;
+  r.className = erreur ? "err" : "";
+  r.style.display = "block";
+}
+
+function calculer() {
+  const nom = $("nom").value.trim(), prenom = $("prenom").value.trim(),
+        email = $("email").value.trim(), dep = $("dep").value, arr = $("arr").value,
+        nb = parseInt($("nb").value), cls = $("classe").value,
+        ar = document.querySelector('input[name=type]:checked').value === "r";
+
+  if (!nom || !prenom || !email) return afficher("Saisir le nom, le prénom et l'email.", 1);
+  if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(email)) return afficher("Email invalide.", 1);
+  if (!dep || !arr) return afficher("Choisir la ville de départ et la ville d'arrivée.", 1);
+  if (dep === arr) return afficher("Les deux villes doivent être différentes.", 1);
+  if (!nb || nb < 1) return afficher("Nombre de voyageurs invalide.", 1);
+
+  const t = TARIFS[[dep, arr].sort().join("-")];
+  const trajets = ar ? 2 : 1;
+  const base = ar ? t[1] : t[0];                  // par personne
+  const supp = cls === "1" ? 50 * trajets : 0;    // 1re classe, par trajet/pers.
+  let services = 0;
+  if ($("dej").checked)  services += 60 * trajets;  // par trajet
+  if ($("jour").checked) services += 12 * trajets;  // paquet de 5 journaux
+  if ($("wifi").checked) services += 10;            // tout le voyage
+
+  const total = (base + supp + services) * nb;
+  afficher(
+    `Voyageur : ${prenom} ${nom} (${email})\n` +
+    `Trajet : ${dep} → ${arr}${ar ? " (aller/retour)" : " (aller simple)"}\n` +
+    `Classe : ${cls === "1" ? "1re" : "2e"} — ${nb} voyageur(s)\n` +
+    `Billet : ${base} DH${supp ? " + " + supp + " DH (1re classe)" : ""} / personne\n` +
+    `Services : ${services} DH / personne\n` +
+    `COÛT GLOBAL : ${total} DH`, 0);
+}
+
+function initialiser() {
+  $("f").reset();
+  $("res").style.display = "none";
+}
+</script>
+</body>
+</html>
